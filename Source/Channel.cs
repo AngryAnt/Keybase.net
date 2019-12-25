@@ -28,20 +28,6 @@ namespace Keybase
 	// TODO: Add intellisense comments
 	public abstract class Channel
 	{
-		public struct Message
-		{
-			public User Author { get; private set; }
-			public string Text { get; private set; }
-
-
-			public Message (API.Chat.Message source)
-			{
-				Author = new User (source.Author);
-				Text = source.Contents;
-			}
-		}
-
-
 		public interface IListener
 		{
 			void OnMessage (Message message);
@@ -89,16 +75,22 @@ namespace Keybase
 		}
 
 
-		private void OnMessage (API.Chat.Message incoming)
+		private void OnMessage (Message incoming)
 		{
-			if (!incoming.Channel.Equals (Name, StringComparison.InvariantCultureIgnoreCase))
+			if (!incoming.TryRead (out Message.Data data))
 			{
-				Log.Message ("{0} ignored incoming message from {1} in {2}", Name, incoming.Author, incoming.Channel);
+				Log.Message ("{0} received a message, but was unable to read it", Name);
 
 				return;
 			}
 
-			Message result = new Message (incoming);
+			if (!data.Channel.Equals (Name, StringComparison.InvariantCultureIgnoreCase))
+			{
+				Log.Message ("{0} ignored incoming message from {1} in {2}", Name, data.Author, data.Channel);
+
+				return;
+			}
+
 			for (int index = m_Listeners.Count - 1; index >= 0; --index)
 			{
 				if (!m_Listeners[index].TryGetTarget (out IListener listener))
@@ -109,7 +101,7 @@ namespace Keybase
 					continue;
 				}
 
-				listener.OnMessage (result);
+				listener.OnMessage (incoming);
 			}
 		}
 

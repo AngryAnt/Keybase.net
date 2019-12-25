@@ -21,7 +21,6 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Timers;
 using framebunker;
 using Utf8Json;
 using Utf8Json.Resolvers;
@@ -37,7 +36,10 @@ namespace Keybase
 				kAPIArguments = "chat api",
 				kListenArguments = "chat api-listen",
 				kListenOutputStart = "Listening for chat notifications.";
-			private const int kAPIProcessPoolSize = 10;
+			private const int
+				kAPIProcessPoolSize = 10,
+				kMessageLogMax = 2048,
+				kMessageLogResize = 1024;
 			private const double kAPIProcessTimeoutSeconds = 10;
 
 
@@ -86,7 +88,7 @@ namespace Keybase
 			]
 			private class Incoming
 			{
-				private class Message
+				public class Message
 				{
 					private ulong id;
 					private string conversation_id;
@@ -102,13 +104,17 @@ namespace Keybase
 					private string channel_mention;
 
 
+					public DateTime Received { get; internal set; }
+
+
+					public ulong GetID () => id;
 					public Channel GetChannel () => channel;
 					public Sender GetSender () => sender;
 					public Content GetContent () => content;
 				}
 
 
-				private class Channel
+				public class Channel
 				{
 					private string
 						name,
@@ -121,7 +127,7 @@ namespace Keybase
 				}
 
 
-				private class Sender
+				public class Sender
 				{
 					private string
 						uid,
@@ -134,7 +140,7 @@ namespace Keybase
 				}
 
 
-				private class Content
+				public class Content
 				{
 					private string type;
 					private Text text;
@@ -144,7 +150,7 @@ namespace Keybase
 				}
 
 
-				private class Text
+				public class Text
 				{
 					private string
 						body/*,
@@ -159,7 +165,7 @@ namespace Keybase
 				}
 
 
-				private class UserMention
+				public class UserMention
 				{
 					private string
 						text,
@@ -167,7 +173,7 @@ namespace Keybase
 				}
 
 
-				private class TeamMention
+				public class TeamMention
 				{
 					private string
 						name,
@@ -175,7 +181,7 @@ namespace Keybase
 				}
 
 
-				private class Pagination
+				public class Pagination
 				{
 					private string
 						next,
@@ -192,33 +198,124 @@ namespace Keybase
 				private Pagination pagination;
 
 
-				public Chat.Message ToMessage ()
+				public Keybase.Message ToMessage ()
 				{
-					return new Chat.Message
+					ulong id;
+
+					// Bail if this is not a valid message after all
+					if (null == msg || 0 == (id = msg.GetID ()))
 					{
-						Channel = msg?.GetChannel ()?.GetName () ?? "",
-						Author = msg?.GetSender ()?.GetName () ?? "",
-						Contents = msg?.GetContent ()?.GetText ()?.GetBody () ?? ""
-					};
+						return Keybase.Message.Invalid;
+					}
+
+					// If this message is logged, just return a wrapper for it
+					if (s_Messages.Find (m => msg == m) == msg)
+					{
+						return new Keybase.Message (id);
+					}
+
+					// If we already hold a different version of this message, get rid of it (we assume this one is newer)
+					s_Messages.Find (m => id == m.GetID (), pop: true);
+
+					// Try to add the new message, resizing the log if necessary
+					if (!s_Messages.Add (msg))
+					{
+						ReduceMessageLog ();
+
+						if (!s_Messages.Add (msg))
+						{
+							return Keybase.Message.Invalid;
+						}
+					}
+
+					// Clean up the old instance if found, return new wrapper
+					return new Keybase.Message (id);
+				}
+
+
+				public bool MarkReceipt ()
+				{
+					if (null == msg)
+					{
+						return false;
+					}
+
+					msg.Received = DateTime.Now;
+
+					return true;
 				}
 			}
 #pragma warning restore CS0169, CS0649
 
 
-			public struct Message
+			private static Pool<PooledProcess> s_APIProcessPool = null;
+			private static Pool<Incoming.Message> s_Messages =
+				new Pool<Incoming.Message> (kMessageLogMax, p => new Incoming.Message ());
+
+
+			[CanBeNull] private static PooledProcess RetainAPIProcess ()
 			{
-				public string Channel { get; internal set; }
-				public string Author { get; internal set; }
-				public string Contents { get; internal set; }
+				return (s_APIProcessPool ??= PooledProcess.CreatePool (kAPIProcessPoolSize, kAPIArguments))?.Retain ();
 			}
 
 
-			private static Pool<PooledProcess> s_APIProcessPool = null;
-
-
-			[CanBeNull] static PooledProcess RetainAPIProcess ()
+			private static void ReduceMessageLog ()
 			{
-				return (s_APIProcessPool ??= PooledProcess.CreatePool (kAPIProcessPoolSize, kAPIArguments))?.Retain ();
+				if (kMessageLogResize > s_Messages.Stored)
+				{
+					return;
+				}
+
+				// Run through the log to determine min & max receipt time, then determine the medium value as halfway between the two //
+
+				long
+					min = DateTime.MaxValue.Ticks,
+					max = DateTime.MinValue.Ticks;
+
+				s_Messages.Foreach (m =>
+				{
+					long current = m.Received.Ticks;
+
+					if (min > current)
+					{
+						min = current;
+					}
+
+					if (max < current)
+					{
+						max = current;
+					}
+				});
+
+				long mid = min + (max - min) / 2;
+
+				// While log size is still above target, try to remove messages older than medium
+				while (s_Messages.Stored > kMessageLogResize && null != s_Messages.Find (m => m.Received.Ticks < mid, pop: true))
+				{}
+			}
+
+
+			/// <summary>
+			/// Read the message from the log, returning whether the read was successful, passing the data via out if so
+			/// </summary>
+			public static bool TryReadFromLog (ulong id, out Message.Data result)
+			{
+				Incoming.Message cache = s_Messages.Find (m => id == m.GetID ());
+
+				if (null == cache)
+				{
+					result = default;
+					return false;
+				}
+
+				result = new Message.Data
+				{
+					Channel = cache.GetChannel ()?.GetName () ?? "",
+					Author = cache.GetSender ()?.GetName () ?? "",
+					Contents = cache.GetContent ()?.GetText ()?.GetBody () ?? ""
+				};
+
+				return true;
 			}
 
 
@@ -314,16 +411,31 @@ namespace Keybase
 					Log.Message ("API.Chat.Listen process received data: {0}", arguments.Data);
 #endif
 
-					Message message = JsonSerializer.Deserialize<Incoming> (
+					Incoming incoming = JsonSerializer.Deserialize<Incoming> (
 						arguments.Data,
 						StandardResolver.AllowPrivateCamelCase
-					).ToMessage ();
+					);
 
+					if (!incoming.MarkReceipt ())
+					{
+						Log.Error ("API.Chat.Listen MarkReceipt failed. Incoming contained no message structure?");
+						return;
+					}
+
+					Message message = incoming.ToMessage ();
+
+					if (message.Valid)
+					{
 #if DEBUG_API_TRANSMISSION
-					Log.Message ("API.Chat.Listen invoking result handler: {0}", response.Message);
+						Log.Message ("API.Chat.Listen invoking result handler: {0}", response.Message);
 #endif
 
-					onIncoming (message);
+						onIncoming (message);
+					}
+					else
+					{
+						Log.Error ("API.Chat.Listen failed to log an incoming message. Keeping busy?");
+					}
 				};
 
 				bool receivedStartMessage = false;
