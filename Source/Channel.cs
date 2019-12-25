@@ -77,6 +77,7 @@ namespace Keybase
 
 		private void OnMessage (Message incoming)
 		{
+			// TODO: Actually store the incoming message? Or should we be able to get a Channel from the API and query its log the same way?
 			if (!incoming.TryRead (out Message.Data data))
 			{
 				Log.Message ("{0} received a message, but was unable to read it", Name);
@@ -109,6 +110,7 @@ namespace Keybase
 		private void OnListenError ()
 		{
 			m_Listening = false;
+			// TODO: We should not be reviewing directly here - on pain of infinite recursion in error state scenarios
 			ReviewListening ();
 		}
 	}
