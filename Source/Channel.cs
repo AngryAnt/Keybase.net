@@ -20,6 +20,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 
 using System;
 using System.Collections.Generic;
+using framebunker;
 
 
 namespace Keybase
@@ -104,7 +105,7 @@ namespace Keybase
 				{
 					Log.Message ("{0} cleaned up dead listener", Name);
 
-					m_Listeners.RemoveAt (index);
+					m_Listeners.FastRemoveAt (index);
 					continue;
 				}
 
