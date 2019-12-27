@@ -43,6 +43,9 @@ namespace Keybase
 
 			public static bool operator == (ID a, ID b) => a.HashCode == b.HashCode;
 			public static bool operator != (ID a, ID b) => a.HashCode != b.HashCode;
+
+
+			public override string ToString () => ConversationID + ", " + MessageID;
 		}
 
 
