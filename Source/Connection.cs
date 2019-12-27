@@ -59,6 +59,13 @@ namespace Keybase
 		}
 
 
+		private static void SanitiseMessageContents ([NotNull] ref string text)
+		{
+			// TODO: This should probably be a StringBuilder parameter which we run a regex replace on
+			text = text.Replace ("\n", "\\n").Replace ("\t", "\\t").Replace ("\"", "\\\"");
+		}
+
+
 		// TODO: Consider pros & cons of maintaining some sort of channel list in stead of just creating them - any downsides?
 
 
@@ -84,7 +91,7 @@ namespace Keybase
 		{
 			TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool> ();
 
-			// TODO: This should probably be a StringBuilder parameter which we run a regex replace on
+			SanitiseMessageContents (ref text);
 			text = text.Replace ("\n", "\\n").Replace ("\t", "\\t").Replace ("\"", "\\\"");
 
 			API.Chat.Request (
