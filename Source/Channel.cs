@@ -26,7 +26,7 @@ using framebunker;
 namespace Keybase
 {
 	// TODO: Add intellisense comments
-	public abstract class Channel
+	public abstract class Channel : API.Chat.IListener
 	{
 		public interface IListener
 		{
@@ -39,6 +39,9 @@ namespace Keybase
 
 
 		[NotNull] public abstract string Name { get; }
+
+
+		API.Chat.DeletePolicy API.Chat.IListener.DeletePolicy => API.Chat.DeletePolicy.Remove;
 
 
 		public void AddListener ([NotNull] IListener listener)
@@ -70,15 +73,15 @@ namespace Keybase
 
 			Log.Message ("With {0} listeners, {1} now starts listening", m_Listeners.Count, Name);
 
+			API.Chat.Listen (this);
 			m_Listening = true;
-			API.Chat.Listen (OnMessage, OnListenError);
 		}
 
 
-		private void OnMessage (Message incoming)
+		void API.Chat.IListener.OnIncoming (Message message)
 		{
 			// TODO: Actually store the incoming message? Or should we be able to get a Channel from the API and query its log the same way?
-			if (!incoming.TryRead (out Message.Data data))
+			if (!message.TryRead (out Message.Data data))
 			{
 				Log.Message ("{0} received a message, but was unable to read it", Name);
 
@@ -102,15 +105,24 @@ namespace Keybase
 					continue;
 				}
 
-				listener.OnMessage (incoming);
+				listener.OnMessage (message);
 			}
 		}
 
 
-		private void OnListenError ()
+		void API.Chat.IListener.OnDelete (Message.ID target)
+		{}
+
+
+		void API.Chat.IListener.OnError ()
 		{
+			// Bail if we experienced an error while attempting to set up listening - no infinite recursion kthx
+			if (!m_Listening)
+			{
+				return;
+			}
+
 			m_Listening = false;
-			// TODO: We should not be reviewing directly here - on pain of infinite recursion in error state scenarios
 			ReviewListening ();
 		}
 	}

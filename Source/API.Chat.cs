@@ -21,6 +21,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using framebunker;
 using Utf8Json;
 using Utf8Json.Resolvers;
@@ -39,7 +40,8 @@ namespace Keybase
 			private const int
 				kAPIProcessPoolSize = 10,
 				kMessageLogMax = 2048,
-				kMessageLogResize = 1024;
+				kMessageLogResize = 1024,
+				kIDListPoolSize = 32;
 			private const double kAPIProcessTimeoutSeconds = 10;
 
 
@@ -111,6 +113,7 @@ namespace Keybase
 
 
 					public Keybase.Message.ID GetID () => new Keybase.Message.ID (conversation_id, id);
+					public string GetConversationID () => conversation_id;
 					public Channel GetChannel () => channel;
 					public Sender GetSender () => sender;
 					public Content GetContent () => content;
@@ -162,8 +165,9 @@ namespace Keybase
 					private Text edit; // optional
 
 
-					public Text GetText () => text;
 					public Type GetContentType () => Enum.TryParse (typeof (Type), type, true, out object result) ? (Type)result : Type.Unknown;
+					public Text GetText () => text;
+					public Delete GetDelete () => delete;
 				}
 
 
@@ -192,6 +196,9 @@ namespace Keybase
 				public class Delete
 				{
 					private ulong[] messageIDs;
+
+
+					public ulong[] GetIDs () => messageIDs;
 				}
 
 
@@ -268,6 +275,23 @@ namespace Keybase
 				}
 
 
+				[CanBeNull] public PooledList<Keybase.Message.ID> ToDeleteList ()
+				{
+					ulong[] messageIDs = msg?.GetContent ()?.GetDelete ()?.GetIDs ();
+
+					if (null == messageIDs)
+					{
+						return null;
+					}
+
+					PooledList<Keybase.Message.ID> result = s_IDListPool.Retain ();
+
+					result.Value.AddRange (messageIDs.Select (messageID => new Keybase.Message.ID (msg.GetConversationID (), messageID)));
+
+					return result;
+				}
+
+
 				public bool MarkReceipt ()
 				{
 					if (null == msg)
@@ -283,6 +307,27 @@ namespace Keybase
 #pragma warning restore CS0169, CS0649
 
 
+			[Flags]
+			public enum DeletePolicy
+			{
+				Remove = 1,
+				Callback = 1 << 1,
+				CallbackAndRemove = Remove | Callback
+			}
+
+
+			public interface IListener
+			{
+				DeletePolicy DeletePolicy { get; }
+
+
+				void OnIncoming (Message message);
+				void OnDelete (Message.ID target);
+				void OnError ();
+			}
+
+
+			private static ListPool<Message.ID> s_IDListPool = new ListPool<Message.ID> (kIDListPoolSize);
 			private static Pool<PooledProcess> s_APIProcessPool = null;
 			private static Pool<Incoming.Message> s_Messages =
 				new Pool<Incoming.Message> (kMessageLogMax, p => new Incoming.Message ());
@@ -330,12 +375,9 @@ namespace Keybase
 			}
 
 
-			/// <summary>
-			/// Read the message from the log, returning whether the read was successful, passing the data via out if so
-			/// </summary>
-			public static bool TryReadFromLog (Message.ID id, out Message.Data result)
+			private static bool FindMessage (Message.ID id, out Message.Data result, bool pop)
 			{
-				Incoming.Message cache = s_Messages.Find (m => id == m.GetID ());
+				Incoming.Message cache = s_Messages.Find (m => id == m.GetID (), pop: pop);
 
 				if (null == cache)
 				{
@@ -352,6 +394,24 @@ namespace Keybase
 
 				return true;
 			}
+
+
+			/// <summary>
+			/// Read the message from the log, returning whether the read was successful, passing the data via out if so
+			/// </summary>
+			public static bool TryReadFromLog (Message.ID id, out Message.Data result) => FindMessage (id, out result, pop: false);
+
+
+			/// <summary>
+			/// Remove the message from the log, returning whether it was deleted or could not be found
+			/// </summary>
+			public static bool TryRemoveFromLog (Message.ID id) => FindMessage (id, out Message.Data result, pop: true);
+
+
+			/// <summary>
+			/// Remove the message from the log, returning whether it was found, passing its data via out if so
+			/// </summary>
+			public static bool TryRemoveFromLog (Message.ID id, out Message.Data result) => FindMessage (id, out result, pop: true);
 
 
 			/// <remarks>Runs <see cref="Keybase.API.Environment.EnsureInitialization"/>.</remarks>
@@ -425,12 +485,12 @@ namespace Keybase
 
 
 			/// <remarks>Runs <see cref="Keybase.API.Environment.EnsureInitialization"/>.</remarks>
-			public static void Listen ([NotNull] Action<Message> onIncoming, [NotNull] Action onError)
+			public static void Listen ([NotNull] IListener listener)
 			{
 				Process process;
 				if (null == (process = CreateProcess (kListenArguments)))
 				{
-					onError ();
+					listener.OnError ();
 
 					return;
 				}
@@ -469,11 +529,44 @@ namespace Keybase
 								Log.Message ("API.Chat.Listen invoking result handler: {0}", response.Message);
 #endif
 
-								onIncoming (message);
+								listener.OnIncoming (message);
 							}
 							else
 							{
 								Log.Error ("API.Chat.Listen failed to log an incoming message. Keeping busy?");
+							}
+						break;
+						case Incoming.Content.Type.Delete:
+							DeletePolicy policy = listener.DeletePolicy;
+
+							using (PooledList<Message.ID> targets = incoming.ToDeleteList ())
+							{
+								if (null == targets)
+								{
+									Log.Error ("API.Chat.Listen received delete with an invalid targets list");
+
+									return;
+								}
+
+#if DEBUG_API_LISTEN
+								Log.Message ("API.Chat.Listen handling delete of {0} messages", targets.Value.Count);
+#endif
+								
+								if (policy.HasFlag (DeletePolicy.Callback))
+								{
+									foreach (Message.ID target in targets.Value)
+									{
+										listener.OnDelete (target);
+									}
+								}
+
+								if (policy.HasFlag (DeletePolicy.Remove))
+								{
+									foreach (Message.ID target in targets.Value)
+									{
+										TryRemoveFromLog (target);
+									}
+								}
 							}
 						break;
 						case Incoming.Content.Type.Unknown:
@@ -514,7 +607,7 @@ namespace Keybase
 					Log.Message ("API.Chat.Listen process exit");
 #endif
 
-					onError ();
+					listener.OnError ();
 
 					process.EnableRaisingEvents = false;
 					process.Dispose ();
@@ -527,7 +620,7 @@ namespace Keybase
 					Log.Message ("API.Chat.Listen process failed to start");
 #endif
 
-					onError ();
+					listener.OnError ();
 
 					return;
 				}
