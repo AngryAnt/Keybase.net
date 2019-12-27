@@ -540,6 +540,7 @@ namespace Keybase
 
 
 			/// <remarks>Runs <see cref="Keybase.API.Environment.EnsureInitialization"/>.</remarks>
+			/// <remarks>For available requests and responses, see keybase chat api -h</remarks>
 			public static void Request ([NotNull] string json, [NotNull] Action<string> onResult, [NotNull] Action onError)
 			{
 				PooledProcess pooledProcess;
