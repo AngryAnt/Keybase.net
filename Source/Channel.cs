@@ -31,6 +31,7 @@ namespace Keybase
 		public interface IListener
 		{
 			void OnMessage (Message message);
+			void OnReaction(Reaction reaction);
 		}
 
 
@@ -78,12 +79,29 @@ namespace Keybase
 		}
 
 
+		private void ForValidListeners (Action<IListener> call)
+		{
+			for (int index = m_Listeners.Count - 1; index >= 0; --index)
+			{
+				if (!m_Listeners[index].TryGetTarget (out IListener listener))
+				{
+					Log.Message ("{0} cleaned up dead listener", Name);
+
+					m_Listeners.FastRemoveAt (index);
+					continue;
+				}
+
+				call (listener);
+			}
+		}
+
+
 		void API.Chat.IListener.OnIncoming (Message message)
 		{
 			// TODO: Actually store the incoming message? Or should we be able to get a Channel from the API and query its log the same way?
 			if (!message.TryRead (out Message.Data data))
 			{
-				Log.Message ("{0} received a message, but was unable to read it", Name);
+				Log.Error ("{0} received a message, but was unable to read it", Name);
 
 				return;
 			}
@@ -95,18 +113,27 @@ namespace Keybase
 				return;
 			}
 
-			for (int index = m_Listeners.Count - 1; index >= 0; --index)
+			ForValidListeners (l => l.OnMessage (message));
+		}
+
+
+		void API.Chat.IListener.OnReaction (Reaction reaction)
+		{
+			if (!reaction.TryRead (out Reaction.Data data))
 			{
-				if (!m_Listeners[index].TryGetTarget (out IListener listener))
-				{
-					Log.Message ("{0} cleaned up dead listener", Name);
+				Log.Error ("{0} received a reaction, but was unable to read it", Name);
 
-					m_Listeners.FastRemoveAt (index);
-					continue;
-				}
-
-				listener.OnMessage (message);
+				return;
 			}
+
+			if (!data.Channel.Equals (Name, StringComparison.InvariantCultureIgnoreCase))
+			{
+				Log.Message ("{0} ignored incoming reaction from {1} in {2}", Name, data.Author, data.Channel);
+
+				return;
+			}
+
+			ForValidListeners (l => l.OnReaction (reaction));
 		}
 
 

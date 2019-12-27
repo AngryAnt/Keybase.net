@@ -88,5 +88,24 @@ namespace Keybase
 
 			return API.Chat.TryReadFromLog (Self, out result);
 		}
+
+
+		/// <summary>
+		/// Count the number of logged reactions to this message
+		/// </summary>
+		public int CountReactions ()
+		{
+			return API.Chat.CountReactions (Self);
+		}
+
+
+		/// <summary>
+		/// Read the logged reactions to this message into the <see cref="destination"/> array,
+		/// at an optional <see cref="offset"/>, returning available reactions count
+		/// </summary>
+		public int ReadReactions (Reaction[] destination, int offset = 0)
+		{
+			return API.Chat.ReadReactions (Self, destination, offset);
+		}
 	}
 }

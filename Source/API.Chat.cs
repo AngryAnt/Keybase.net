@@ -113,6 +113,8 @@ namespace Keybase
 
 
 					public Keybase.Message.ID GetID () => new Keybase.Message.ID (conversation_id, id);
+					public Keybase.Message.ID GetReactionTargetID () =>
+						new Keybase.Message.ID (conversation_id, content?.GetReaction ()?.GetTargetMessageID () ?? 0);
 					public string GetConversationID () => conversation_id;
 					public Channel GetChannel () => channel;
 					public Sender GetSender () => sender;
@@ -167,6 +169,7 @@ namespace Keybase
 
 					public Type GetContentType () => Enum.TryParse (typeof (Type), type, true, out object result) ? (Type)result : Type.Unknown;
 					public Text GetText () => text;
+					public Reaction GetReaction () => reaction;
 					public Delete GetDelete () => delete;
 				}
 
@@ -190,6 +193,10 @@ namespace Keybase
 				{
 					private ulong m;
 					private string b;
+
+
+					public ulong GetTargetMessageID () => m;
+					public string GetBody () => b;
 				}
 
 
@@ -275,6 +282,41 @@ namespace Keybase
 				}
 
 
+				public Keybase.Reaction ToReaction ()
+				{
+					Keybase.Message.ID id;
+
+					// Bail if this is not a valid reaction after all
+					if (null == msg || !(id = msg.GetID ()).Valid)
+					{
+						return Keybase.Reaction.Invalid;
+					}
+
+					// If this reaction is logged, just return a wrapper for it
+					if (s_Messages.Find (m => msg == m) == msg)
+					{
+						return new Keybase.Reaction (id);
+					}
+
+					// If we already hold a different version of this reaction, get rid of it (we assume this one is newer)
+					s_Messages.Find (m => id == m.GetID (), pop: true);
+
+					// Try to add the new reaction, resizing the log if necessary
+					if (!s_Messages.Add (msg))
+					{
+						ReduceMessageLog ();
+
+						if (!s_Messages.Add (msg))
+						{
+							return Keybase.Reaction.Invalid;
+						}
+					}
+
+					// Clean up the old instance if found, return new wrapper
+					return new Keybase.Reaction (id);
+				}
+
+
 				[CanBeNull] public PooledList<Keybase.Message.ID> ToDeleteList ()
 				{
 					ulong[] messageIDs = msg?.GetContent ()?.GetDelete ()?.GetIDs ();
@@ -322,6 +364,7 @@ namespace Keybase
 
 
 				void OnIncoming (Message message);
+				void OnReaction (Reaction reaction);
 				void OnDelete (Message.ID target);
 				void OnError ();
 			}
@@ -396,6 +439,36 @@ namespace Keybase
 			}
 
 
+			private static bool FindReaction (Message.ID id, out Reaction.Data result, bool pop)
+			{
+				Incoming.Message cache = s_Messages.Find (m => id == m.GetID (), pop: pop);
+
+				if (null == cache)
+				{
+					result = default;
+					return false;
+				}
+
+				Incoming.Reaction reaction = cache.GetContent ()?.GetReaction ();
+
+				result = new Reaction.Data
+				{
+					Channel = cache.GetChannel ()?.GetName () ?? "",
+					Author = cache.GetSender ()?.GetName () ?? "",
+					Target = cache.GetReactionTargetID (),
+					Contents = reaction?.GetBody () ?? ""
+				};
+
+				return true;
+			}
+
+
+			/// <summary>
+			/// Remove the message or reaction from the log, returning whether it was deleted or could not be found
+			/// </summary>
+			public static bool TryRemoveFromLog (Message.ID id) => FindMessage (id, out Message.Data result, pop: true);
+
+
 			/// <summary>
 			/// Read the message from the log, returning whether the read was successful, passing the data via out if so
 			/// </summary>
@@ -403,15 +476,67 @@ namespace Keybase
 
 
 			/// <summary>
-			/// Remove the message from the log, returning whether it was deleted or could not be found
-			/// </summary>
-			public static bool TryRemoveFromLog (Message.ID id) => FindMessage (id, out Message.Data result, pop: true);
-
-
-			/// <summary>
 			/// Remove the message from the log, returning whether it was found, passing its data via out if so
 			/// </summary>
 			public static bool TryRemoveFromLog (Message.ID id, out Message.Data result) => FindMessage (id, out result, pop: true);
+
+
+			/// <summary>
+			/// Read the reaction from the log, returning whether the read was successful, passing the data via out if so
+			/// </summary>
+			public static bool TryReadFromLog (Message.ID id, out Reaction.Data result) => FindReaction (id, out result, pop: false);
+
+
+			/// <summary>
+			/// Remove the reaction from the log, returning whether it was found, passing its data via out if so
+			/// </summary>
+			public static bool TryRemoveFromLog (Message.ID id, out Reaction.Data result) => FindReaction (id, out result, pop: true);
+
+
+			/// <summary>
+			/// Returns the number of reactions to the given <see cref="id"/>
+			/// </summary>
+			public static int CountReactions (Message.ID id)
+			{
+				int result = 0;
+				s_Messages.Foreach (m =>
+				{
+					if (m.GetReactionTargetID () == id)
+					{
+						++result;
+					}
+				});
+
+				return result;
+			}
+
+
+			/// <summary>
+			/// Read the logged reactions to this message into the <see cref="destination"/> array,
+			/// at an optional <see cref="offset"/>, returning available reactions count
+			/// </summary>
+			public static int ReadReactions (Message.ID id, [NotNull] Reaction[] destination, int offset = 0)
+			{
+				int count = 0;
+				offset = offset < 0 ? 0 : offset;
+
+				s_Messages.Foreach (m =>
+				{
+					if (m.GetReactionTargetID() != id)
+					{
+						return;
+					}
+
+					int index = offset + count++;
+
+					if (index < destination.Length)
+					{
+						destination[index] = new Reaction (m.GetID ());
+					}
+				});
+
+				return count;
+			}
 
 
 			/// <remarks>Runs <see cref="Keybase.API.Environment.EnsureInitialization"/>.</remarks>
@@ -526,7 +651,7 @@ namespace Keybase
 							if (message.Valid)
 							{
 #if DEBUG_API_LISTEN
-								Log.Message ("API.Chat.Listen invoking result handler: {0}", response.Message);
+								Log.Message ("API.Chat.Listen invoking OnIncoming: {0}", message);
 #endif
 
 								listener.OnIncoming (message);
@@ -534,6 +659,28 @@ namespace Keybase
 							else
 							{
 								Log.Error ("API.Chat.Listen failed to log an incoming message. Keeping busy?");
+							}
+						break;
+						case Incoming.Content.Type.Reaction:
+							if (!incoming.MarkReceipt ())
+							{
+								Log.Error ("API.Chat.Listen MarkReceipt failed. Incoming contained no message structure?");
+								return;
+							}
+
+							Reaction reaction = incoming.ToReaction ();
+
+							if (reaction.Valid)
+							{
+#if DEBUG_API_LISTEN
+								Log.Message ("API.Chat.Listen invoking OnReaction: {0}", reaction);
+#endif
+
+								listener.OnReaction (reaction);
+							}
+							else
+							{
+								Log.Error ("API.Chat.Listen failed to log an incoming reaction. Keeping busy?");
 							}
 						break;
 						case Incoming.Content.Type.Delete:
@@ -551,7 +698,7 @@ namespace Keybase
 #if DEBUG_API_LISTEN
 								Log.Message ("API.Chat.Listen handling delete of {0} messages", targets.Value.Count);
 #endif
-								
+
 								if (policy.HasFlag (DeletePolicy.Callback))
 								{
 									foreach (Message.ID target in targets.Value)
