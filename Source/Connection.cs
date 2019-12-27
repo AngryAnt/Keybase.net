@@ -27,7 +27,9 @@ namespace Keybase
 	// TODO: Add intellisense comments
 	public class Connection : IDisposable
 	{
-		private const string kMessageSentResult = "message sent";
+		private const string
+			kMessageSentResult = "message sent",
+			kReactionSentResult = "message reacted to";
 
 
 		private class SelfChannel : Channel
@@ -92,7 +94,6 @@ namespace Keybase
 			TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool> ();
 
 			SanitiseMessageContents (ref text);
-			text = text.Replace ("\n", "\\n").Replace ("\t", "\\t").Replace ("\"", "\\\"");
 
 			API.Chat.Request (
 				json: "{\"method\": \"send\", \"params\": {\"options\": {\"channel\": {\"name\": \"" + destination + "\"}, \"message\": {\"body\": \"" + text + "\"}}}}",
@@ -107,6 +108,32 @@ namespace Keybase
 					completionSource = null;
 				},
 				onError: () => completionSource.SetResult (false)
+			);
+
+			return completionSource.Task;
+		}
+
+
+		[NotNull] public Task<bool> ReactAsync ([NotNull] Channel destination, Message.ID messageID, [NotNull] string reaction)
+		{
+			TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool> ();
+
+			SanitiseMessageContents (ref reaction);
+
+			API.Chat.Request (
+				json: "{\"method\": \"reaction\", \"params\": {\"options\": {\"channel\": {\"name\": \"" + destination +
+					"\"}, \"message_id\": " + messageID.MessageID +", \"message\": {\"body\": \"" + reaction + "\"}}}}",
+				onResult: result =>
+				{
+					if (completionSource == null)
+					{
+						return;
+					}
+
+					completionSource.SetResult (result != null && result.Equals (kReactionSentResult, StringComparison.InvariantCultureIgnoreCase));
+					completionSource = null;
+				},
+				onError: () => completionSource.SetResult(false)
 			);
 
 			return completionSource.Task;

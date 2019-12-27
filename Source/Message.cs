@@ -22,7 +22,7 @@ namespace Keybase
 
 			// TODO: Determine if there is any actual need to keep the IDs around
 			private string ConversationID { get; }
-			private ulong MessageID { get; }
+			internal ulong MessageID { get; }
 			private int HashCode { get; }
 
 
