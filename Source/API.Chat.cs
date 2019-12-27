@@ -107,7 +107,7 @@ namespace Keybase
 					public DateTime Received { get; internal set; }
 
 
-					public ulong GetID () => id;
+					public Keybase.Message.ID GetID () => new Keybase.Message.ID (conversation_id, id);
 					public Channel GetChannel () => channel;
 					public Sender GetSender () => sender;
 					public Content GetContent () => content;
@@ -200,10 +200,10 @@ namespace Keybase
 
 				public Keybase.Message ToMessage ()
 				{
-					ulong id;
+					Keybase.Message.ID id;
 
 					// Bail if this is not a valid message after all
-					if (null == msg || 0 == (id = msg.GetID ()))
+					if (null == msg || !(id = msg.GetID ()).Valid)
 					{
 						return Keybase.Message.Invalid;
 					}
@@ -298,7 +298,7 @@ namespace Keybase
 			/// <summary>
 			/// Read the message from the log, returning whether the read was successful, passing the data via out if so
 			/// </summary>
-			public static bool TryReadFromLog (ulong id, out Message.Data result)
+			public static bool TryReadFromLog (Message.ID id, out Message.Data result)
 			{
 				Incoming.Message cache = s_Messages.Find (m => id == m.GetID ());
 

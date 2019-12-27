@@ -1,3 +1,7 @@
+using System;
+using Math = framebunker.Math;
+
+
 namespace Keybase
 {
 	/// <summary>
@@ -5,6 +9,43 @@ namespace Keybase
 	/// </summary>
 	public struct Message
 	{
+		/// <summary>
+		/// A unique message identifier
+		/// </summary>
+		public struct ID : IEquatable<ID>
+		{
+			public static ID Invalid => new ID ();
+
+
+			public bool Valid => MessageID > 0;
+
+
+			// TODO: Determine if there is any actual need to keep the IDs around
+			private string ConversationID { get; }
+			private ulong MessageID { get; }
+			private int HashCode { get; }
+
+
+			public ID ([NotNull] string conversationID, ulong messageID)
+			{
+				ConversationID = conversationID;
+				MessageID = messageID;
+				HashCode = Math.GetHashCode (conversationID, messageID);
+			}
+
+
+			public bool Equals (ID other) => HashCode == other.HashCode;
+
+
+			public override bool Equals (object obj) => null != obj && obj is ID other && HashCode == other.HashCode;
+			public override int GetHashCode () => HashCode;
+
+
+			public static bool operator == (ID a, ID b) => a.HashCode == b.HashCode;
+			public static bool operator != (ID a, ID b) => a.HashCode != b.HashCode;
+		}
+
+
 		/// <summary>
 		/// A snapshot of the contents of a <see cref="Message"/>
 		/// </summary>
@@ -19,15 +60,15 @@ namespace Keybase
 		public static Message Invalid => new Message ();
 
 
-		public bool Valid => ID > 0;
+		public bool Valid => Self.Valid;
 
 
-		private ulong ID { get; }
+		private ID Self { get; }
 
 
-		public Message (ulong id)
+		public Message (ID id)
 		{
-			ID = id;
+			Self = id;
 		}
 
 
@@ -42,7 +83,7 @@ namespace Keybase
 				return false;
 			}
 
-			return API.Chat.TryReadFromLog (ID, out result);
+			return API.Chat.TryReadFromLog (Self, out result);
 		}
 	}
 }
