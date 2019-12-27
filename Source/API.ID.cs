@@ -176,7 +176,7 @@ namespace Keybase
 						return;
 					}
 
-#if DEBUG_API_TRANSMISSION
+#if DEBUG_API_ID
 					Log.Message ("API.ID process exit");
 #endif
 
@@ -184,13 +184,13 @@ namespace Keybase
 
 					if (!string.IsNullOrWhiteSpace (data))
 					{
-#if DEBUG_API_TRANSMISSION
+#if DEBUG_API_ID
 						Log.Message("API.ID process data: {0}", data);
 #endif
 
 						Response response = JsonSerializer.Deserialize<Response> (data, StandardResolver.AllowPrivateCamelCase);
 
-#if DEBUG_API_TRANSMISSION
+#if DEBUG_API_ID
 						Log.Message("API.ID.Request invoking result handler: {0}", response.Name);
 #endif
 
@@ -206,7 +206,7 @@ namespace Keybase
 					process = null;
 				};
 
-#if DEBUG_API_TRANSMISSION
+#if DEBUG_API_ID
 				Log.Message (
 					"API.ID starting process at {0} with arguments '{1}'",
 					process.StartInfo.FileName,
@@ -216,7 +216,7 @@ namespace Keybase
 
 				if (!process.Start ())
 				{
-#if DEBUG_API_TRANSMISSION
+#if DEBUG_API_ID
 					Log.Message ("API.ID process failed to start");
 #endif
 

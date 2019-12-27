@@ -442,7 +442,7 @@ namespace Keybase
 						return;
 					}
 
-#if DEBUG_API_TRANSMISSION
+#if DEBUG_API_LISTEN
 					Log.Message ("API.Chat.Listen process received data: {0}", arguments.Data);
 #endif
 
@@ -465,7 +465,7 @@ namespace Keybase
 
 							if (message.Valid)
 							{
-#if DEBUG_API_TRANSMISSION
+#if DEBUG_API_LISTEN
 								Log.Message ("API.Chat.Listen invoking result handler: {0}", response.Message);
 #endif
 
@@ -510,7 +510,7 @@ namespace Keybase
 						return;
 					}
 
-#if DEBUG_API_TRANSMISSION
+#if DEBUG_API_LISTEN
 					Log.Message ("API.Chat.Listen process exit");
 #endif
 
@@ -523,7 +523,7 @@ namespace Keybase
 
 				if (!process.Start ())
 				{
-#if DEBUG_API_TRANSMISSION
+#if DEBUG_API_LISTEN
 					Log.Message ("API.Chat.Listen process failed to start");
 #endif
 
