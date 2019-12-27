@@ -43,6 +43,9 @@ namespace Keybase
 			private const double kAPIProcessTimeoutSeconds = 10;
 
 
+			// TODO: Since we have arrays in the mix, there is little point to convert to structs. Look at using pools and custom deserialization handlers in stead.
+
+
 #pragma warning disable CS0169, CS0649
 			[
 				SuppressMessage ("ReSharper", "ClassNeverInstantiated.Local"),
@@ -73,7 +76,7 @@ namespace Keybase
 				private Result result;
 
 
-				public override string ToString()
+				public override string ToString ()
 				{
 					return result?.Message ?? "";
 				}
@@ -231,6 +234,8 @@ namespace Keybase
 
 					// If we already hold a different version of this message, get rid of it (we assume this one is newer)
 					s_Messages.Find (m => id == m.GetID (), pop: true);
+
+					// TODO: When we have reactions and such integrated, we should merge that part of the popped message into the new one
 
 					// Try to add the new message, resizing the log if necessary
 					if (!s_Messages.Add (msg))
