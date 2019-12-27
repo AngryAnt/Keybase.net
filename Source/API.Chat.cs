@@ -145,6 +145,16 @@ namespace Keybase
 
 				public class Content
 				{
+					public enum Type
+					{
+						Unknown,
+						Text,
+						Reaction,
+						Edit,
+						Delete
+					}
+
+
 					private string type; // text/reaction/edit/delete
 					private Text text; // optional
 					private Reaction reaction; // optional
@@ -153,6 +163,7 @@ namespace Keybase
 
 
 					public Text GetText () => text;
+					public Type GetContentType () => Enum.TryParse (typeof (Type), type, true, out object result) ? (Type)result : Type.Unknown;
 				}
 
 
@@ -215,6 +226,9 @@ namespace Keybase
 					source;
 				private Message msg;
 				private Pagination pagination;
+
+
+				public Content.Type GetContentType () => msg?.GetContent ()?.GetContentType () ?? Content.Type.Unknown;
 
 
 				public Keybase.Message ToMessage ()
@@ -437,25 +451,37 @@ namespace Keybase
 						StandardResolver.AllowPrivateCamelCase
 					);
 
-					if (!incoming.MarkReceipt ())
+					Incoming.Content.Type type = incoming.GetContentType ();
+					switch (type)
 					{
-						Log.Error ("API.Chat.Listen MarkReceipt failed. Incoming contained no message structure?");
-						return;
-					}
+						case Incoming.Content.Type.Text:
+							if (!incoming.MarkReceipt ())
+							{
+								Log.Error ("API.Chat.Listen MarkReceipt failed. Incoming contained no message structure?");
+								return;
+							}
 
-					Message message = incoming.ToMessage ();
+							Message message = incoming.ToMessage ();
 
-					if (message.Valid)
-					{
+							if (message.Valid)
+							{
 #if DEBUG_API_TRANSMISSION
-						Log.Message ("API.Chat.Listen invoking result handler: {0}", response.Message);
+								Log.Message ("API.Chat.Listen invoking result handler: {0}", response.Message);
 #endif
 
-						onIncoming (message);
-					}
-					else
-					{
-						Log.Error ("API.Chat.Listen failed to log an incoming message. Keeping busy?");
+								onIncoming (message);
+							}
+							else
+							{
+								Log.Error ("API.Chat.Listen failed to log an incoming message. Keeping busy?");
+							}
+						break;
+						case Incoming.Content.Type.Unknown:
+							Log.Error ("API.Chat.Listen received unknown content type. Incomplete API spec?", arguments.Data);
+						return;
+						default:
+							Log.Warning ("API.Chat.Listen received unhandled content type: {0}", type);
+						break;
 					}
 				};
 
