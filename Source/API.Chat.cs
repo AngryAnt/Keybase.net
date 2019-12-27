@@ -145,10 +145,11 @@ namespace Keybase
 
 				public class Content
 				{
-					private string type; // text/reaction/delete
+					private string type; // text/reaction/edit/delete
 					private Text text; // optional
 					private Reaction reaction; // optional
 					private Delete delete; // optional
+					private Text edit; // optional
 
 
 					public Text GetText () => text;
