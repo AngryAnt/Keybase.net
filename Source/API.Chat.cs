@@ -142,8 +142,10 @@ namespace Keybase
 
 				public class Content
 				{
-					private string type;
-					private Text text;
+					private string type; // text/reaction/delete
+					private Text text; // optional
+					private Reaction reaction; // optional
+					private Delete delete; // optional
 
 
 					public Text GetText () => text;
@@ -162,6 +164,19 @@ namespace Keybase
 
 
 					public string GetBody () => body;
+				}
+
+
+				public class Reaction
+				{
+					private ulong m;
+					private string b;
+				}
+
+
+				public class Delete
+				{
+					private ulong[] messageIDs;
 				}
 
 
