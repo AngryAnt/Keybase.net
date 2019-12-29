@@ -66,7 +66,7 @@ namespace Keybase
 		public bool Valid => Self.Valid;
 
 
-		private ID Self { get; }
+		internal ID Self { get; }
 
 
 		public Message (ID id)

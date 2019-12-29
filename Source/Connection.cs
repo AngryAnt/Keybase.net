@@ -114,6 +114,12 @@ namespace Keybase
 		}
 
 
+		[NotNull] public Task<bool> ReactAsync ([NotNull] Channel destination, Message message, [NotNull] string reaction)
+		{
+			return ReactAsync (destination, message.Self, reaction);
+		}
+
+
 		[NotNull] public Task<bool> ReactAsync ([NotNull] Channel destination, Message.ID messageID, [NotNull] string reaction)
 		{
 			TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool> ();
