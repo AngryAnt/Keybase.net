@@ -7,12 +7,12 @@ namespace Keybase
 	/// <summary>
 	/// A message received by the Chat API, updated with edits as long as it fits in the log
 	/// </summary>
-	public struct Message
+	public struct Message : IEquatable<Message>, IEquatable<Message.ID>
 	{
 		/// <summary>
 		/// A unique message identifier
 		/// </summary>
-		public struct ID : IEquatable<ID>
+		public struct ID : IEquatable<ID>, IEquatable<Message>
 		{
 			public static ID Invalid => new ID ();
 
@@ -35,9 +35,11 @@ namespace Keybase
 
 
 			public bool Equals (ID other) => HashCode == other.HashCode;
+			public bool Equals (Message other) => Equals (other.Self);
 
 
-			public override bool Equals (object obj) => null != obj && obj is ID other && HashCode == other.HashCode;
+			public override bool Equals (object obj) =>
+				(obj is ID id && id.Equals (this)) || (obj is Message message && message.Self.Equals (this));
 			public override int GetHashCode () => HashCode;
 
 
@@ -107,5 +109,22 @@ namespace Keybase
 		{
 			return API.Chat.ReadReactions (Self, destination, offset);
 		}
+
+
+		bool IEquatable<Message>.Equals (Message other) => other.Self == Self;
+		bool IEquatable<ID>.Equals (ID other) => other == Self;
+
+
+		public override bool Equals (object obj) =>
+			((obj is ID id && id.Equals (Self)) || (obj is Message message && message.Self.Equals (Self)));
+
+		public override int GetHashCode () => Self.GetHashCode ();
+
+
+		public static bool operator == (Message a, ID b) => a.Self == b;
+		public static bool operator != (Message a, ID b) => a.Self != b;
+
+		public static bool operator == (ID a, Message b) => a == b.Self;
+		public static bool operator != (ID a, Message b) => a != b.Self;
 	}
 }

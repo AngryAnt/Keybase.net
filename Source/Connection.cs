@@ -152,7 +152,7 @@ namespace Keybase
 			return DeleteAsync (destination, message.Self);
 		}
 
-		
+
 		[NotNull] public Task<bool> DeleteAsync ([NotNull] Channel destination, Message.ID messageID)
 		{
 			TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool> ();
