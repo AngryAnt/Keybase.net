@@ -28,8 +28,9 @@ namespace Keybase
 	public class Connection : IDisposable
 	{
 		private const string
-			kMessageSentResult = "message sent",
-			kReactionSentResult = "message reacted to";
+			kMessageResult = "message sent",
+			kReactionResult = "message reacted to",
+			kDeleteResult = "message deleted";
 
 
 		private class SelfChannel : Channel
@@ -104,7 +105,7 @@ namespace Keybase
 						return;
 					}
 
-					completionSource.SetResult (result != null && result.Equals (kMessageSentResult, StringComparison.InvariantCultureIgnoreCase));
+					completionSource.SetResult (result != null && result.Equals (kMessageResult, StringComparison.InvariantCultureIgnoreCase));
 					completionSource = null;
 				},
 				onError: () => completionSource.SetResult (false)
@@ -136,7 +137,37 @@ namespace Keybase
 						return;
 					}
 
-					completionSource.SetResult (result != null && result.Equals (kReactionSentResult, StringComparison.InvariantCultureIgnoreCase));
+					completionSource.SetResult (result != null && result.Equals (kReactionResult, StringComparison.InvariantCultureIgnoreCase));
+					completionSource = null;
+				},
+				onError: () => completionSource.SetResult(false)
+			);
+
+			return completionSource.Task;
+		}
+
+
+		[NotNull] public Task<bool> DeleteAsync ([NotNull] Channel destination, Message message)
+		{
+			return DeleteAsync (destination, message.Self);
+		}
+
+		
+		[NotNull] public Task<bool> DeleteAsync ([NotNull] Channel destination, Message.ID messageID)
+		{
+			TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool> ();
+
+			API.Chat.Request (
+				json: "{\"method\": \"delete\", \"params\": {\"options\": {\"channel\": {\"name\": \"" + destination +
+					"\"}, \"message_id\": " + messageID.MessageID +"}}}",
+				onResult: result =>
+				{
+					if (completionSource == null)
+					{
+						return;
+					}
+
+					completionSource.SetResult (result != null && result.Equals (kDeleteResult, StringComparison.InvariantCultureIgnoreCase));
 					completionSource = null;
 				},
 				onError: () => completionSource.SetResult(false)
