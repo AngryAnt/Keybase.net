@@ -600,7 +600,7 @@ namespace Keybase
 						pooledProcess.Dispose ();
 						pooledProcess = null;
 					}
-				).Timeout = kAPIProcessTimeoutSeconds * 100;
+				).Timeout = kAPIProcessTimeoutSeconds * 1000;
 
 #if DEBUG_API_TRANSMISSION
 				Log.Message ("API.Chat.Request: Writing to process: {0}", json);
