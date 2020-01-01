@@ -51,7 +51,7 @@ namespace Keybase
 			private User m_Target = null;
 
 
-			public override string Name => m_Owner.User + "," + m_Target;
+			public override string Name => m_Target + "," + m_Owner.User;
 
 
 			public DirectChannel ([NotNull] Connection owner, [NotNull] User target)
