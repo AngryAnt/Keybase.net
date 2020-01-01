@@ -22,6 +22,7 @@ using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Timers;
 using framebunker;
 using Utf8Json;
 using Utf8Json.Resolvers;
@@ -546,6 +547,7 @@ namespace Keybase
 				PooledProcess pooledProcess;
 				if (null == (pooledProcess = RetainAPIProcess ()))
 				{
+					Log.Error ("API.Chat.Request: Failed to retain a process from the pool");
 					onError ();
 
 					return;
@@ -591,9 +593,7 @@ namespace Keybase
 							return;
 						}
 
-#if DEBUG_API_TRANSMISSION
-						Log.Message ("API.Chat.Request process " + (arguments is ElapsedEventArgs ? "timeout" : "unexpected exit"));
-#endif
+						Log.Error ("API.Chat.Request process " + (arguments is ElapsedEventArgs ? "timeout" : "unexpected exit"));
 
 						onError ();
 
