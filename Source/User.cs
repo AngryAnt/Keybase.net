@@ -18,11 +18,16 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  */
 
 
+using System;
+
+
 namespace Keybase
 {
-	public class User
+	public struct User : IEquatable<User>
 	{
 		[NotNull] public string Name { get; }
+		public bool Valid => !string.IsNullOrWhiteSpace (Name);
+		public Channel Channel => Valid ? Channel.Direct (this) : default;
 
 
 		public User ([NotNull] string name)
@@ -31,9 +36,13 @@ namespace Keybase
 		}
 
 
-		public override string ToString ()
-		{
-			return Name;
-		}
+		public override string ToString () => Name;
+		public override int GetHashCode () => Name.GetHashCode ();
+
+		public bool Equals (User other) => Name.Equals (other.Name, StringComparison.InvariantCultureIgnoreCase);
+		public override bool Equals (object obj) => obj != null && obj is User other && ((IEquatable<User>)this).Equals (other);
+
+		public static bool operator== (User a, User b) => ((IEquatable<User>)a).Equals (b);
+		public static bool operator!= (User a, User b) => !((IEquatable<User>)a).Equals (b);
 	}
 }

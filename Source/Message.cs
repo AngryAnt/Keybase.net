@@ -56,8 +56,8 @@ namespace Keybase
 		/// </summary>
 		public struct Data
 		{
-			public string Channel { get; internal set; }
-			public string Author { get; internal set; }
+			public Channel Channel { get; internal set; }
+			public User Author { get; internal set; }
 			public string Contents { get; internal set; }
 		}
 

@@ -19,138 +19,45 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 
 
 using System;
-using System.Collections.Generic;
-using framebunker;
-
 
 namespace Keybase
 {
 	// TODO: Add intellisense comments
-	public abstract class Channel : API.Chat.IListener
+	public struct Channel : IEquatable<Channel>
 	{
-		public interface IListener
+		internal static Channel Deserialized ([NotNull] string name) => new Channel { Name = name };
+
+
+		public static Channel Self () => Direct (API.Environment.User);
+		public static Channel Direct (User other) => new Channel { Name = other + "," + API.Environment.User };
+		// TODO: Implement team channels. Probably via a team struct?
+
+
+		[NotNull] public string Name { get; private set; }
+		public bool Valid => !string.IsNullOrWhiteSpace (Name);
+		public bool IsDirect => Name.Contains (',');
+
+
+		public bool TryGetDirectRecipient (out User other)
 		{
-			void OnMessage (Message message);
-			void OnReaction(Reaction reaction);
-		}
-
-
-		private List<WeakReference<IListener>> m_Listeners = new List<WeakReference<IListener>> ();
-		private bool m_Listening = false;
-
-
-		[NotNull] public abstract string Name { get; }
-
-
-		API.Chat.DeletePolicy API.Chat.IListener.DeletePolicy => API.Chat.DeletePolicy.Remove;
-
-
-		public void AddListener ([NotNull] IListener listener)
-		{
-			m_Listeners.Add (new WeakReference<IListener> (listener));
-			ReviewListening ();
-		}
-
-
-		public void RemoveListener ([NotNull] IListener listener)
-		{
-			m_Listeners.RemoveAll (r => !r.TryGetTarget (out IListener l) || l == listener);
-			ReviewListening ();
-		}
-
-
-		public sealed override string ToString ()
-		{
-			return Name;
-		}
-
-
-		private void ReviewListening ()
-		{
-			if (m_Listening || m_Listeners.Count < 1)
+			if (!IsDirect)
 			{
-				return;
+				other = default;
+				return false;
 			}
 
-			Log.Message ("With {0} listeners, {1} now starts listening", m_Listeners.Count, Name);
-
-			API.Chat.Listen (this);
-			m_Listening = true;
+			other = new User (Name.Substring (0, Name.IndexOf (',')));
+			return true;
 		}
 
 
-		private void ForValidListeners (Action<IListener> call)
-		{
-			for (int index = m_Listeners.Count - 1; index >= 0; --index)
-			{
-				if (!m_Listeners[index].TryGetTarget (out IListener listener))
-				{
-					Log.Message ("{0} cleaned up dead listener", Name);
+		public override string ToString () => Name;
+		public override int GetHashCode () => Name.GetHashCode ();
 
-					m_Listeners.FastRemoveAt (index);
-					continue;
-				}
+		public bool Equals (Channel other) => Name.Equals (other.Name, StringComparison.InvariantCultureIgnoreCase);
+		public override bool Equals (object obj) => obj != null && obj is Channel other && ((IEquatable<Channel>)this).Equals (other);
 
-				call (listener);
-			}
-		}
-
-
-		void API.Chat.IListener.OnIncoming (Message message)
-		{
-			// TODO: Actually store the incoming message? Or should we be able to get a Channel from the API and query its log the same way?
-			if (!message.TryRead (out Message.Data data))
-			{
-				Log.Error ("{0} received a message, but was unable to read it", Name);
-
-				return;
-			}
-
-			if (!data.Channel.Equals (Name, StringComparison.InvariantCultureIgnoreCase))
-			{
-				Log.Message ("{0} ignored incoming message from {1} in {2}", Name, data.Author, data.Channel);
-
-				return;
-			}
-
-			ForValidListeners (l => l.OnMessage (message));
-		}
-
-
-		void API.Chat.IListener.OnReaction (Reaction reaction)
-		{
-			if (!reaction.TryRead (out Reaction.Data data))
-			{
-				Log.Error ("{0} received a reaction, but was unable to read it", Name);
-
-				return;
-			}
-
-			if (!data.Channel.Equals (Name, StringComparison.InvariantCultureIgnoreCase))
-			{
-				Log.Message ("{0} ignored incoming reaction from {1} in {2}", Name, data.Author, data.Channel);
-
-				return;
-			}
-
-			ForValidListeners (l => l.OnReaction (reaction));
-		}
-
-
-		void API.Chat.IListener.OnDelete (Message.ID target)
-		{}
-
-
-		void API.Chat.IListener.OnError ()
-		{
-			// Bail if we experienced an error while attempting to set up listening - no infinite recursion kthx
-			if (!m_Listening)
-			{
-				return;
-			}
-
-			m_Listening = false;
-			ReviewListening ();
-		}
+		public static bool operator== (Channel a, Channel b) => ((IEquatable<Channel>)a).Equals (b);
+		public static bool operator!= (Channel a, Channel b) => !((IEquatable<Channel>)a).Equals (b);
 	}
 }

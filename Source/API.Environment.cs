@@ -45,6 +45,7 @@ namespace Keybase
 
 			[NotNull] public static string BinaryPath = kAutoTestBinaryPaths[0];
 			[NotNull] public static string Username = string.Empty;
+			public static User User => new User (Username);
 
 
 			public static bool Initialized { get; private set; } = false;
