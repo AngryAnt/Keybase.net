@@ -138,6 +138,36 @@ namespace Keybase
 			}
 
 
+			[NotNull] public static async Task<bool> ReplyAsync (Message message, [NotNull] string text)
+			{
+				if (!message.TryRead (out Message.Data data))
+				{
+					return false;
+				}
+
+				SanitiseMessageContents (ref text);
+
+				TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool> ();
+
+				Request (
+					json: "{\"method\": \"send\", \"params\": {\"options\": {\"channel\": {\"name\": \"" + data.Channel + "\"}, \"message\": {\"body\": \"" + text + "\"}, \"reply_to\": " + message.Self.MessageID + "}}}",
+					onResult: result =>
+					{
+						if (completionSource == null)
+						{
+							return;
+						}
+
+						completionSource.SetResult (result != null && result.Equals (kMessageResult, StringComparison.InvariantCultureIgnoreCase));
+						completionSource = null;
+					},
+					onError: () => completionSource.SetResult (false)
+				);
+
+				return await completionSource.Task;
+			}
+
+
 			[NotNull] public static Task<bool> ReactAsync (Channel destination, Message message, [NotNull] string reaction)
 			{
 				return ReactAsync (destination, message.Self, reaction);
