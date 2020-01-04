@@ -79,7 +79,7 @@ namespace Keybase
 				SuppressMessage ("ReSharper", "InconsistentNaming"),
 				SuppressMessage ("ReSharper", "IdentifierTypo")
 			]
-			private class Incoming
+			internal class Incoming
 			{
 				public class Message
 				{
@@ -115,11 +115,13 @@ namespace Keybase
 					private string
 						name,
 						members_type,
-						topic_type/*,
-						topic_name*/; // TODO: Optional
+						topic_type,
+						topic_name;
 
 
-					public string GetName () => name;
+					public bool IsTeam => members_type.Equals ("team", StringComparison.InvariantCultureIgnoreCase);
+					public string GetTeam () => IsTeam ? name : null;
+					public string GetName () => IsTeam ? topic_name : name;
 				}
 
 

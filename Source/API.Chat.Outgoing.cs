@@ -120,7 +120,7 @@ namespace Keybase
 				SanitiseMessageContents (ref text);
 
 				Request (
-					json: "{\"method\": \"send\", \"params\": {\"options\": {\"channel\": {\"name\": \"" + destination + "\"}, \"message\": {\"body\": \"" + text + "\"}}}}",
+					json: "{\"method\": \"send\", \"params\": {\"options\": {\"channel\": " + destination.ToOutgoingJSON () + ", \"message\": {\"body\": \"" + text + "\"}}}}",
 					onResult: result => ValidateResult (result, kMessageResult, ref completionSource),
 					onError: () => completionSource.SetResult (false)
 				);
@@ -141,7 +141,7 @@ namespace Keybase
 				TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool> ();
 
 				Request (
-					json: "{\"method\": \"send\", \"params\": {\"options\": {\"channel\": {\"name\": \"" + data.Channel + "\"}, \"message\": {\"body\": \"" + text + "\"}, \"reply_to\": " + message.Self.MessageID + "}}}",
+					json: "{\"method\": \"send\", \"params\": {\"options\": {\"channel\": " + data.Channel.ToOutgoingJSON () + ", \"message\": {\"body\": \"" + text + "\"}, \"reply_to\": " + message.Self.MessageID + "}}}",
 					onResult: result => ValidateResult (result, kMessageResult, ref completionSource),
 					onError: () => completionSource.SetResult (false)
 				);
@@ -163,8 +163,8 @@ namespace Keybase
 				SanitiseMessageContents (ref reaction);
 
 				Request (
-					json: "{\"method\": \"reaction\", \"params\": {\"options\": {\"channel\": {\"name\": \"" + destination +
-						"\"}, \"message_id\": " + messageID.MessageID +", \"message\": {\"body\": \"" + reaction + "\"}}}}",
+					json: "{\"method\": \"reaction\", \"params\": {\"options\": {\"channel\": " + destination.ToOutgoingJSON () +
+						", \"message_id\": " + messageID.MessageID +", \"message\": {\"body\": \"" + reaction + "\"}}}}",
 					onResult: result => ValidateResult (result, kReactionResult, ref completionSource),
 					onError: () => completionSource.SetResult (false)
 				);
@@ -184,8 +184,8 @@ namespace Keybase
 				TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool> ();
 
 				Request (
-					json: "{\"method\": \"delete\", \"params\": {\"options\": {\"channel\": {\"name\": \"" + destination +
-						"\"}, \"message_id\": " + messageID.MessageID +"}}}",
+					json: "{\"method\": \"delete\", \"params\": {\"options\": {\"channel\": " + destination.ToOutgoingJSON () +
+						", \"message_id\": " + messageID.MessageID +"}}}",
 					onResult: result => ValidateResult (result, kDeleteResult, ref completionSource),
 					onError: () => completionSource.SetResult (false)
 				);

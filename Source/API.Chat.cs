@@ -100,7 +100,7 @@ namespace Keybase
 
 				result = new Message.Data
 				{
-					Channel = Channel.Deserialized (cache.GetChannel ()?.GetName () ?? ""),
+					Channel = Channel.Deserialized (cache.GetChannel ()),
 					Author = new User (cache.GetSender ()?.GetName () ?? ""),
 					Contents = cache.GetContent ()?.GetText ()?.GetBody () ?? ""
 				};
@@ -123,7 +123,7 @@ namespace Keybase
 
 				result = new Reaction.Data
 				{
-					Channel = Channel.Deserialized (cache.GetChannel ()?.GetName () ?? ""),
+					Channel = Channel.Deserialized (cache.GetChannel ()),
 					Author = new User (cache.GetSender ()?.GetName () ?? ""),
 					Target = cache.GetReactionTargetID (),
 					Contents = reaction?.GetBody () ?? ""

@@ -25,17 +25,41 @@ namespace Keybase
 	// TODO: Add intellisense comments
 	public struct Channel : IEquatable<Channel>
 	{
-		internal static Channel Deserialized ([NotNull] string name) => new Channel { Name = name };
+		internal static Channel Deserialized ([CanBeNull] API.Chat.Incoming.Channel channel)
+		{
+			if (null == channel)
+			{
+				return Invalid;
+			}
+
+			Channel result = new Channel ();
+
+			string
+				name = channel.GetName (),
+				team = channel.GetTeam ();
+
+			if (!string.IsNullOrWhiteSpace (team))
+			{
+				result.Team = Team.Deserialized (team);
+			}
+
+			result.Name = name;
+
+			return result;
+		}
 
 
+		public static Channel Invalid => new Channel ();
 		public static Channel Self () => Direct (API.Environment.User);
 		public static Channel Direct (User other) => new Channel { Name = other + "," + API.Environment.User };
-		// TODO: Implement team channels. Probably via a team struct?
+		public static Channel InTeam (Team team, [NotNull] string name) => new Channel { Team = team, Name = name };
 
 
+		public Team Team { get; private set; }
 		[NotNull] public string Name { get; private set; }
 		public bool Valid => !string.IsNullOrWhiteSpace (Name);
-		public bool IsDirect => Name.Contains (',');
+		public bool IsTeam => Team.Valid;
+		public bool IsDirect => !IsTeam && Name.Contains (',');
 
 
 		public bool TryGetDirectRecipient (out User other)
@@ -51,10 +75,17 @@ namespace Keybase
 		}
 
 
-		public override string ToString () => Name;
-		public override int GetHashCode () => Name.GetHashCode ();
+		public string ToOutgoingJSON () => Team.Valid
+			? "{\"name\": \"" + Team.Name + "\", \"members_type\": \"team\", \"topic_name\": \"" + Name + "\"}"
+			: "{\"name\": \"" + Name + "\"}";
 
-		public bool Equals (Channel other) => Name.Equals (other.Name, StringComparison.InvariantCultureIgnoreCase);
+
+		public override string ToString () => Team.Valid ? Team + "#" + Name : Name;
+		public override int GetHashCode () => ToString ().GetHashCode ();
+
+		public bool Equals (Channel other) =>
+			Team.Equals (other.Team) &&
+			Name.Equals (other.Name, StringComparison.InvariantCultureIgnoreCase);
 		public override bool Equals (object obj) => obj != null && obj is Channel other && ((IEquatable<Channel>)this).Equals (other);
 
 		public static bool operator== (Channel a, Channel b) => ((IEquatable<Channel>)a).Equals (b);
