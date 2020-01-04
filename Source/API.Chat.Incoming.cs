@@ -159,7 +159,7 @@ namespace Keybase
 							}
 						break;
 						case Incoming.Content.Type.Unknown:
-							Log.Error ("API.Chat.Listen received unknown content type. Incomplete API spec?", arguments.Data);
+							Log.Error ("API.Chat.Listen received unknown content type. Incomplete API spec? Data:\n{0}", arguments.Data);
 						return;
 						default:
 							Log.Warning ("API.Chat.Listen received unhandled content type: {0}", type);
