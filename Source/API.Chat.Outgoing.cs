@@ -121,16 +121,7 @@ namespace Keybase
 
 				Request (
 					json: "{\"method\": \"send\", \"params\": {\"options\": {\"channel\": {\"name\": \"" + destination + "\"}, \"message\": {\"body\": \"" + text + "\"}}}}",
-					onResult: result =>
-					{
-						if (completionSource == null)
-						{
-							return;
-						}
-
-						completionSource.SetResult (result != null && result.Equals (kMessageResult, StringComparison.InvariantCultureIgnoreCase));
-						completionSource = null;
-					},
+					onResult: result => ValidateResult (result, kMessageResult, ref completionSource),
 					onError: () => completionSource.SetResult (false)
 				);
 
@@ -151,16 +142,7 @@ namespace Keybase
 
 				Request (
 					json: "{\"method\": \"send\", \"params\": {\"options\": {\"channel\": {\"name\": \"" + data.Channel + "\"}, \"message\": {\"body\": \"" + text + "\"}, \"reply_to\": " + message.Self.MessageID + "}}}",
-					onResult: result =>
-					{
-						if (completionSource == null)
-						{
-							return;
-						}
-
-						completionSource.SetResult (result != null && result.Equals (kMessageResult, StringComparison.InvariantCultureIgnoreCase));
-						completionSource = null;
-					},
+					onResult: result => ValidateResult (result, kMessageResult, ref completionSource),
 					onError: () => completionSource.SetResult (false)
 				);
 
@@ -183,17 +165,8 @@ namespace Keybase
 				Request (
 					json: "{\"method\": \"reaction\", \"params\": {\"options\": {\"channel\": {\"name\": \"" + destination +
 						"\"}, \"message_id\": " + messageID.MessageID +", \"message\": {\"body\": \"" + reaction + "\"}}}}",
-					onResult: result =>
-					{
-						if (completionSource == null)
-						{
-							return;
-						}
-
-						completionSource.SetResult (result != null && result.Equals (kReactionResult, StringComparison.InvariantCultureIgnoreCase));
-						completionSource = null;
-					},
-					onError: () => completionSource.SetResult(false)
+					onResult: result => ValidateResult (result, kReactionResult, ref completionSource),
+					onError: () => completionSource.SetResult (false)
 				);
 
 				return completionSource.Task;
@@ -213,20 +186,38 @@ namespace Keybase
 				Request (
 					json: "{\"method\": \"delete\", \"params\": {\"options\": {\"channel\": {\"name\": \"" + destination +
 						"\"}, \"message_id\": " + messageID.MessageID +"}}}",
-					onResult: result =>
-					{
-						if (completionSource == null)
-						{
-							return;
-						}
-
-						completionSource.SetResult (result != null && result.Equals (kDeleteResult, StringComparison.InvariantCultureIgnoreCase));
-						completionSource = null;
-					},
-					onError: () => completionSource.SetResult(false)
+					onResult: result => ValidateResult (result, kDeleteResult, ref completionSource),
+					onError: () => completionSource.SetResult (false)
 				);
 
 				return completionSource.Task;
+			}
+
+
+			private static void ValidateResult (
+				[CanBeNull] string result,
+				[NotNull] string expected,
+				[CanBeNull] ref TaskCompletionSource<bool> handler
+			)
+			{
+				if (null == handler)
+				{
+					return;
+				}
+
+				bool valid = null != result && result.Equals (expected, StringComparison.InvariantCultureIgnoreCase);
+
+				if (!valid)
+				{
+					Log.Error (
+						"API.Chat.ValidateResult: Unexpected result (in quotes):\n\"{0}\"\nFrom:\n{1}",
+						result ?? "(null)",
+						System.Environment.StackTrace
+					);
+				}
+
+				handler.SetResult (valid);
+				handler = null;
 			}
 
 
