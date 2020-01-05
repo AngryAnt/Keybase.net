@@ -33,12 +33,86 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 
 
 namespace Keybase
 {
 	public static class Log
 	{
+		public static class Settings<T>
+		{
+			public static bool Enabled =>
+#if ANY_LOGGING
+				Settings.Enabled (typeof (T))
+#else
+					false
+#endif
+			;
+		}
+
+
+		public static class Settings
+		{
+			private const string
+				kNamespaceStrike = "KEYBASE_",
+				kNamePrefix = "KEYBASE_NET_DEBUG_";
+
+
+			[CanBeNull] private static string GetName ([NotNull] System.Type type)
+			{
+				string name = type.FullName?.ToUpper ()?.Replace ('.', '_')?.Replace ('+', '_');
+				if (name.StartsWith (kNamespaceStrike))
+				{
+					name = name.Substring (kNamespaceStrike.Length);
+				}
+
+				return name;
+			}
+
+
+			[CanBeNull] private static string GetName ([NotNull] Delegate method)
+			{
+				MethodInfo info = method.Method;
+				System.Type type = info.DeclaringType;
+
+				return null == type ? null : GetName (type) + "_" + info.Name.ToUpper ();
+			}
+
+
+			public static bool Enabled ([NotNull] System.Type type)
+			{
+#if ANY_LOGGING
+				string name = GetName (type);
+				return !string.IsNullOrEmpty (name) && Enabled (name);
+#else
+				return false;
+#endif
+			}
+
+
+			public static bool Enabled ([NotNull] Delegate method)
+			{
+#if ANY_LOGGING
+				string name = GetName (method);
+				return !string.IsNullOrEmpty (name) && Enabled (name);
+#else
+				return false;
+#endif
+			}
+
+
+			public static bool Enabled ([NotNull] string level)
+			{
+#if ANY_LOGGING
+				return null != Environment.GetEnvironmentVariable (kNamePrefix + level.ToUpper ());
+#else
+				return false;
+#endif
+			}
+		}
+
+
 		public enum Type
 		{
 			Message,
@@ -73,6 +147,66 @@ namespace Keybase
 			else
 			{
 				s_OnSendParameterised.Invoke (type, content, parameters);
+			}
+		}
+
+
+		//[Conditional ("ANY_LOGGING")]
+		public static void Debug ([NotNull] System.Type source, Type type, [NotNull] string content)
+		{
+			if (Settings.Enabled (source))
+			{
+				Send (type, content);
+			}
+		}
+
+
+		//[Conditional ("ANY_LOGGING")]
+		public static void Debug ([NotNull] System.Type source, Type type, [NotNull] string content, [NotNull] params object[] parameters)
+		{
+			if (Settings.Enabled (source))
+			{
+				Send (type, content, parameters);
+			}
+		}
+
+
+		//[Conditional ("ANY_LOGGING")]
+		public static void Debug<T> (Type type, [NotNull] string content)
+		{
+			if (Settings<T>.Enabled)
+			{
+				Send (type, content);
+			}
+		}
+
+
+		//[Conditional ("ANY_LOGGING")]
+		public static void Debug<T> (Type type, [NotNull] string content, [NotNull] params object[] parameters)
+		{
+			if (Settings<T>.Enabled)
+			{
+				Send (type, content, parameters);
+			}
+		}
+
+
+		//[Conditional ("ANY_LOGGING")]
+		public static void Debug ([NotNull] Delegate source, Type type, [NotNull] string content)
+		{
+			if (Settings.Enabled (source))
+			{
+				Send (type, content);
+			}
+		}
+
+
+		//[Conditional ("ANY_LOGGING")]
+		public static void Debug ([NotNull] Delegate source, Type type, [NotNull] string content, [NotNull] params object[] parameters)
+		{
+			if (Settings.Enabled (source))
+			{
+				Send (type, content, parameters);
 			}
 		}
 
