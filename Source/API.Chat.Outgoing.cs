@@ -41,6 +41,8 @@ namespace Keybase
 			/// <remarks>For available requests and responses, see keybase chat api -h</remarks>
 			public static void Request ([NotNull] string json, [NotNull] Action<string> onResult, [NotNull] Action onError)
 			{
+				Log.Debug (typeof (Chat), Log.Type.Message, "Outgoing: {0}", json);
+
 				PooledProcess pooledProcess;
 				if (null == (pooledProcess = RetainAPIProcess ()))
 				{

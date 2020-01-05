@@ -69,9 +69,7 @@ namespace Keybase
 						return;
 					}
 
-#if DEBUG_API_LISTEN
-					Log.Message ("API.Chat.Listen process received data: {0}", arguments.Data);
-#endif
+					Log.Debug (typeof (Chat), Log.Type.Message, "Incoming: {0}", arguments.Data);
 
 					Incoming incoming = JsonSerializer.Deserialize<Incoming> (
 						arguments.Data,
@@ -192,9 +190,7 @@ namespace Keybase
 						return;
 					}
 
-#if DEBUG_API_LISTEN
-					Log.Message ("API.Chat.Listen process exit");
-#endif
+					Log.Debug (typeof (Chat), Log.Type.Message, "API.Chat.Listen process exit");
 
 					listener.OnError ();
 
@@ -205,9 +201,7 @@ namespace Keybase
 
 				if (!process.Start ())
 				{
-#if DEBUG_API_LISTEN
-					Log.Message ("API.Chat.Listen process failed to start");
-#endif
+					Log.Error ("API.Chat.Listen process failed to start");
 
 					listener.OnError ();
 
