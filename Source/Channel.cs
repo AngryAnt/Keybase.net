@@ -38,12 +38,16 @@ namespace Keybase
 				name = channel.GetName (),
 				team = channel.GetTeam ();
 
+			result.Name = name;
+
 			if (!string.IsNullOrWhiteSpace (team))
 			{
 				result.Team = Team.Deserialized (team);
 			}
-
-			result.Name = name;
+			else if (!string.IsNullOrWhiteSpace (name) && !name.Contains (','))
+			{
+				result.Name = name + "," + API.Environment.User;
+			}
 
 			return result;
 		}
