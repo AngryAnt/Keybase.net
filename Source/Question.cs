@@ -200,7 +200,10 @@ namespace Keybase
 				m_RequestMessage.TryRead (out Message.Data data)
 			)
 			{
+				m_RequestReceived = new TaskCompletionSource<Message> ();
 				await API.Chat.MessageAsync (Channel, data.Contents);
+				await m_RequestReceived.Task;
+				m_RequestReceived = null;
 			}
 
 			return response;
