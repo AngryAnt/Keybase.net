@@ -57,18 +57,37 @@ namespace Keybase
 					}
 
 
-					public string Message { get; private set; }
+					private string message;
 					private int id;
 					private Ratelimit[] ratelimits;
+
+
+					public override string ToString () => message;
 				}
 
 
-				private Result result;
-
-
-				public override string ToString ()
+				private class Error
 				{
-					return result?.Message ?? "";
+					private string message;
+					private int code;
+
+
+					public override string ToString () => code + ": " + message;
+				}
+
+
+				[CanBeNull] private Result result;
+				[CanBeNull] private Result error;
+
+
+				public bool IsError => null != error;
+				public bool IsResult => null != result;
+				public bool Valid => IsError || IsResult;
+
+
+				[NotNull] public override string ToString ()
+				{
+					return (result ?? error)?.ToString () ?? "";
 				}
 			}
 

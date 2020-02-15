@@ -67,11 +67,23 @@ namespace Keybase
 
 						Response response = JsonSerializer.Deserialize<Response> (arguments.Data, StandardResolver.AllowPrivateCamelCase);
 
+						if (response.IsError)
+						{
+							Log.Error ("API.Chat.Request received error response: {0}", response.ToString ());
+							onError ();
+						}
+						else if (!response.Valid)
+						{
+							Log.Error ("API.Chat.Request received invalid response: {0}", arguments.Data);
+						}
+						else
+						{
 #if DEBUG_API_TRANSMISSION
-						Log.Message ("API.Chat.Request invoking result handler: {0}", response.Message);
+							Log.Message ("API.Chat.Request invoking result handler: {0}", response.ToString ());
 #endif
 
-						onResult (response.ToString ());
+							onResult (response.ToString ());
+						}
 
 						pooledProcess.Dispose ();
 						pooledProcess = null;
