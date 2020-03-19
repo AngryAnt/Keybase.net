@@ -21,6 +21,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 using System.Timers;
 using framebunker;
 
@@ -30,6 +31,11 @@ namespace Keybase
 	// TODO: Generally wrap all decode use of Utf8Json in a utility decode call which catches and logs exceptions
 	public static partial class API
 	{
+		private const string
+			kPingArguments = "ping",
+			kPingReturnSuccessPostfix = " is up";
+
+
 		public class PooledProcess : PoolItem
 		{
 			[CanBeNull] public static Pool<PooledProcess> CreatePool (int size, [CanBeNull] string arguments = "")
@@ -232,6 +238,56 @@ namespace Keybase
 		[CanBeNull] private static Process CreateProcess ([CanBeNull] string arguments = "")
 		{
 			return !Environment.EnsureInitialization () ? null : CreateProcess (Environment.BinaryPath, arguments);
+		}
+
+
+		/// <summary>
+		/// Tests whether the API connection is live. Runs <see cref="EnsureInitialization"/>.
+		/// </summary>
+		[NotNull] public static async Task<bool> Ping ()
+		{
+			Process process = CreateProcess (kPingArguments);
+
+			if (null == process)
+			{
+				return false;
+			}
+
+			TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool> ();
+
+			process.Exited += (sender, arguments) => completionSource.TrySetResult (false);
+
+			process.ErrorDataReceived += (sender, arguments) =>
+			{
+				if (
+					null != arguments?.Data &&
+					arguments.Data.Trim ().EndsWith
+					(
+						kPingReturnSuccessPostfix,
+						StringComparison.InvariantCultureIgnoreCase
+					)
+				)
+				{
+#if DEBUG_API_PING
+					Log.Message ("API.Ping input: '{0}'", arguments.Data);
+#endif
+
+					completionSource.TrySetResult (true);
+				}
+			};
+
+			if (!process.Start ())
+			{
+#if DEBUG_API_PING
+				Log.Message ("API.Ping process failed to start");
+#endif
+
+				return false;
+			}
+
+			process.BeginErrorReadLine ();
+
+			return await completionSource.Task;
 		}
 	}
 }
